@@ -655,3 +655,12 @@ func (dk *DeployKeyOptions) WithContext(ctx context.Context) *DeployKeyOptions {
 	dk.ctx = ctx
 	return dk
 }
+
+type RepositoryPermissionsOptions struct {
+	Owner    string `json:"owner"`
+	RepoSlug string `json:"reposlug"`
+	PageNum  int    `json:"pagenum"`
+	Query    string `json:"query"`
+	Sort     string `json:"sort"`
+	Pagelen  int    `json:"pagelen"`
+}

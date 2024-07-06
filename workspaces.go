@@ -2,6 +2,8 @@ package bitbucket
 
 import (
 	"errors"
+	"net/url"
+	"strconv"
 
 	"github.com/mitchellh/mapstructure"
 )
@@ -48,6 +50,123 @@ type WorkspaceMembers struct {
 	Pagelen int
 	Size    int
 	Members []User
+}
+
+type RepositoryPermissions struct {
+	Page                  int
+	Pagelen               int
+	MaxDepth              int
+	Size                  int
+	Next                  string
+	RepositoryPermissions []RepositoryPermission
+}
+
+type RepositoryPermission struct {
+	Type       string
+	User       User
+	Repository Repository
+	Permission string
+}
+
+func (w *Workspace) ListAllRepositoryPermissions(rpo *RepositoryPermissionsOptions) (*RepositoryPermissions, error) {
+	params := url.Values{}
+	if rpo.Query != "" {
+		params.Add("q", rpo.Query)
+	}
+
+	if rpo.Sort != "" {
+		params.Add("sort", rpo.Sort)
+	}
+
+	if rpo.PageNum > 0 {
+		params.Add("page", strconv.Itoa(rpo.PageNum))
+	}
+
+	if rpo.Pagelen > 0 {
+		params.Add("pagelen", strconv.Itoa(rpo.Pagelen))
+	}
+
+	urlStr := w.c.requestUrl("/workspaces/%s/permissions/repositories?%s", rpo.Owner, params.Encode())
+	response, err := w.c.executePaginated("GET", urlStr, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeRepositoryPermissions(response)
+}
+
+func (w *Workspace) ListRepositoryPermissions(rpo *RepositoryPermissionsOptions) (*RepositoryPermissions, error) {
+	params := url.Values{}
+	if rpo.Query != "" {
+		params.Add("q", rpo.Query)
+	}
+
+	if rpo.Sort != "" {
+		params.Add("sort", rpo.Sort)
+	}
+
+	if rpo.PageNum > 0 {
+		params.Add("page", strconv.Itoa(rpo.PageNum))
+	}
+
+	if rpo.Pagelen > 0 {
+		params.Add("pagelen", strconv.Itoa(rpo.Pagelen))
+	}
+
+	urlStr := w.c.requestUrl("/workspaces/%s/permissions/repositories/%s?%s", rpo.Owner, rpo.RepoSlug, params.Encode())
+	response, err := w.c.executePaginated("GET", urlStr, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeRepositoryPermissions(response)
+}
+
+func decodeRepositoryPermissions(response interface{}) (*RepositoryPermissions, error) {
+	responseMap := response.(map[string]interface{})
+	values := responseMap["values"].([]interface{})
+
+	var variables []RepositoryPermission
+	for _, variable := range values {
+		var repoPermission RepositoryPermission
+		err := mapstructure.Decode(variable, &repoPermission)
+		if err == nil {
+			variables = append(variables, repoPermission)
+		}
+	}
+
+	page, ok := responseMap["page"].(float64)
+	if !ok {
+		page = 0
+	}
+
+	pagelen, ok := responseMap["pagelen"].(float64)
+	if !ok {
+		pagelen = 0
+	}
+	max_depth, ok := responseMap["max_depth"].(float64)
+	if !ok {
+		max_depth = 0
+	}
+	size, ok := responseMap["size"].(float64)
+	if !ok {
+		size = 0
+	}
+
+	next, ok := responseMap["next"].(string)
+	if !ok {
+		next = ""
+	}
+
+	repoPermissions := RepositoryPermissions{
+		Page:                  int(page),
+		Pagelen:               int(pagelen),
+		MaxDepth:              int(max_depth),
+		Size:                  int(size),
+		Next:                  next,
+		RepositoryPermissions: variables,
+	}
+	return &repoPermissions, nil
 }
 
 func (t *Permission) GetUserPermissions(organization, member string) (*Permission, error) {
